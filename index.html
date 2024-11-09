@@ -3,11 +3,388 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kika flashcards</title>
+    <title>Flashcards</title>
+    <link rel="icon" href="cat.png">
     <script src='http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js'></script>
-    <script defer src="decrypter.js"></script>
+    
 </head>
 <body>
+    <style>
     
+        @import url('https://fonts.googleapis.com/css2?family=Sour+Gummy:ital,wght@0,100..900;1,100..900&display=swap');
+        
+        *,body,html{
+            margin: 0;
+            box-sizing:border-box;
+            font-family: "Sour Gummy", sans-serif;
+        }
+        
+        body{
+            display: flex;
+            align-items:center;
+            flex-direction: column;
+            justify-content: center;
+            padding: 2rem;
+        }
+        
+        section{
+            display: flex;
+            flex-direction:column;
+            background-color: #227dbe;
+            padding: 1.5rem;
+            border-radius: 1rem;
+            width: min(max(1000px, 50%), 80%);
+            color:white;
+        }
+        h1{
+            margin-bottom: 1rem;
+        }
+        label{
+            margin-left: .2rem;
+            margin-bottom: .2rem;
+        }
+        input, textarea, button{
+            border-radius: .5rem;
+            border:none;
+            padding: .3rem;
+        }
+        #instruction, #pdf, textarea{
+            margin-bottom: .5rem;
+        }
+        textarea{
+            text-align:left;
+        }
+        .pair{
+            display: flex;
+            align-items: center;
+            justify-content:space-between;
+            padding: 0.2rem;
+            background-color:rgba(0,0,0,0.2);
+            border-radius: .5rem;
+            margin-bottom: .2rem;
+        }
+        .pair div{
+            display:flex;
+            width: 48%;
+        }
+        .pair div input{
+            width: 100%;
+        }
+        section#out{
+            background-color: #22ae6d;
+            margin-top: 1rem;
+        }
+        button{
+            margin: .5rem;
+            padding: .6rem 1rem;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+        button:hover{
+            transform:scale(1.05);
+        }
+        #submit{background-color:pink;}
+        #more{background-color:lightgreen;}
+        #examples .pair div{
+            padding: .2rem .5rem;
+            
+        }button.inactive {
+  background-color: grey !important;
+  animation: loading-pulse 1s infinite;
+}
+
+@keyframes loading-pulse {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.2;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+        </style>
+    <section>
+        <h1>
+            Flashcards pro K. ❤️
+        </h1>
+        <label>Soubor:</label>
+        <input type="file" id="pdf">
+        <label>Příklady:</label>
+        <div class="pair">
+            <div><input type="text" id="ex1q" placeholder="Otázka 1"></div>
+            <div><input type="text" id="ex1a" placeholder="Odpověď 1"></div>
+        </div>
+        <div class="pair">
+            <div><input type="text" id="ex2q" placeholder="Otázka 2"></div>
+            <div><input type="text" id="ex2a" placeholder="Odpověď 2"></div>
+        </div>
+        <label>Spešl Instrukce:</label>
+        <textarea id="instruction" rows="2" cols="50" placeholder="Např. Generuj pouze z Xté kapitoly, Zaměř se hlavně na informace o kočkális brachiális, nezapomeň na slovákis lilis a info o dělostřelecké fakultě"></textarea>
+        
+        <label>Kolik (X) Generovat na jedno kliknutí:</label>
+        <input type="number" id="num" value="100" min="1" max="150">
+        <label>Model AI:</label>
+        <input type="text" id="model" value="gemini-1.5-pro">
+        <div id="buttons">
+            <button id="submit">Začít generovat</button>
+            <button id="more">Vygenerovat Dalších X</button>
+        </div>
+    </section>
+    <section id="out">
+        <h1>Výsledky 🐈 (0)</h1>
+        <div id="copy">
+            <button id="copybutton">Zkopírovat flashcards</button>
+        </div>
+        <label>Ukázka z výstupu (každá 10. kartička):</label>
+        <div id="outex">
+        </div>
+    </section>
+    <script src="googleai.js"></script>
+    <script src="server.js"></script>
+    <script src="decrypter.js"></script>
+    <script>
+    function examples(){
+        return "Examples:   "+JSON.stringify({
+            "flashcards": [
+                {
+                    "number": 1,
+                    "question": $("#ex1q").val(),
+                    "answer": $("#ex1a").val()
+                },
+                {
+                    "number": 2,
+                    "question": $("#ex2q").val(),
+                    "answer": $("#ex2a").val()
+                }
+            ]
+        })
+    }
+
+    async function generate(){
+        $("button").addClass("inactive")
+        console.log(window.chatSession)
+        let response = await window.chatSession.sendMessage("Generate "+$("#num").val()+" flashcards")
+        console.log(response)
+        let resp = JSON.parse(await response.response.text())
+        console.log(resp)
+        $("button").removeClass("inactive")
+        window.cards = [...window.cards, ...resp.flashcards]
+        $("#out h1").text("Výsledky 🐈("+window.cards.length+")")
+        draw()
+    }
+
+    $("#num").change(()=>{
+
+    })
+
+    function draw(){
+        $("#outex").html()
+        for(let i =0;i<window.cards.length;i+=10){
+            printCard(window.cards[i].question, window.cards[i].answer)
+        }
+    }
+
+    window.cards = []
+
+    $("#copybutton").click(()=>{
+        copyTextToClipboard(window.cards.map(x=>x.question+" --- "+x.answer).join("\n"))
+    })
+
+    $("#submit").click(async ()=>{
+        window.chatSession = await chatMeUp()
+        window.cards = []
+        generate()
+    })
+
+    $("#more").click(()=>{generate()})
+    
+    function printCard(q, a){
+        $("#outex").append(
+            $("<div></div>").addClass("pair").append(
+                $("<div></div>").text(q),
+                $("<div></div>").text(a)
+            )
+        )
+    }
+    
+    const {
+      GoogleGenerativeAI,
+      HarmCategory,
+      HarmBlockThreshold,
+    } = genai;
+    //const { GoogleAIFileManager } = 
+    
+    const apiKey = Uluru.decrypt('9f6ce022b1990fa01iN3H11/J8gRpRkQ+Umcm6nHsBRAqApIHU1t8wGUDrIQqkf5hrja2a314d14cb1b0e2d400f0f2efb17857c', prompt("Tajné heslo:"));
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const fileManager = new GoogleAIFileManager(apiKey);
+    
+    /**
+     * Uploads the given file to Gemini.
+     *
+     * See https://ai.google.dev/gemini-api/docs/prompting_with_media
+     */
+    async function uploadToGemini(path, mimeType) {
+      const uploadResult = await fileManager.uploadFile(path, {
+        mimeType,
+        displayName: path,
+      });
+      const file = uploadResult.file;
+      console.log(`Uploaded file ${file.displayName} as: ${file.name}`);
+      return file;
+    }
+    
+    /**
+     * Waits for the given files to be active.
+     *
+     * Some files uploaded to the Gemini API need to be processed before they can
+     * be used as prompt inputs. The status can be seen by querying the file's
+     * "state" field.
+     *
+     * This implementation uses a simple blocking polling loop. Production code
+     * should probably employ a more sophisticated approach.
+     */
+    async function waitForFilesActive(files) {
+      console.log("Waiting for file processing...");
+      for (const name of files.map((file) => file.name)) {
+        let file = await fileManager.getFile(name);
+        while (file.state === "PROCESSING") {
+          process.stdout.write(".")
+          await new Promise((resolve) => setTimeout(resolve, 10_000));
+          file = await fileManager.getFile(name)
+        }
+        if (file.state !== "ACTIVE") {
+          throw Error(`File ${file.name} failed to process`);
+        }
+      }
+      console.log("...all files ready\n");
+    }
+    
+    
+    const generationConfig = {
+      temperature: 0.4,
+      topP: 0.95,
+      topK: 40,
+      maxOutputTokens: 8192,
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: "object",
+        properties: {
+          flashcards: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                number: {
+                  type: "number"
+                },
+                question: {
+                  type: "string"
+                },
+                answer: {
+                  type: "string"
+                }
+              },
+              required: [
+                "number",
+                "question",
+                "answer"
+              ]
+            }
+          }
+        },
+        required: [
+          "flashcards"
+        ]
+      },
+    };
+    
+    $(document).ready(function() {
+    $('#pdf').on('change', function(event) {
+        const file = event.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                window.pdf_file = e.target.result;
+                console.log('File content loaded into window.pdf_file');
+            };
+            reader.readAsArrayBuffer(file); // or readAsDataURL(file) if it's a binary file
+        }
+    });
+});
+
+
+    async function chatMeUp() {
+    const model = genAI.getGenerativeModel({
+      model: $("#model").val(),
+      systemInstruction: "generate flashcards pairs in czech based on the provided materials for veterinary science",
+    });
+      // TODO Make these files available on the local file system
+      // You may need to update the file paths
+      const files = [
+        await uploadToGemini("Materials.pdf", "application/pdf"),
+      ];
+    
+      // Some files have a processing delay. Wait for them to be ready.
+      await waitForFilesActive(files);
+    
+      let chatSession = await model.startChat({
+        generationConfig,
+        history: [
+          {
+            role: "user",
+            parts: [
+            {text: examples()},
+            {text: "Any special instructions:"+$("#instruction").val()},
+              {
+                fileData: {
+                  mimeType: files[0].mimeType,
+                  fileUri: files[0].uri,
+                },
+              },
+            ],
+          },
+        ],
+      });
+    
+      return chatSession
+    }
+    
+    function fallbackCopyTextToClipboard(text) {
+  var textArea = document.createElement("textarea");
+  textArea.value = text;
+  
+  // Avoid scrolling to bottom
+  textArea.style.top = "0";
+  textArea.style.left = "0";
+  textArea.style.position = "fixed";
+
+  document.body.appendChild(textArea);
+  textArea.focus();
+  textArea.select();
+
+  try {
+    var successful = document.execCommand('copy');
+    var msg = successful ? 'successful' : 'unsuccessful';
+    console.log('Fallback: Copying text command was ' + msg);
+  } catch (err) {
+    console.error('Fallback: Oops, unable to copy', err);
+  }
+
+  document.body.removeChild(textArea);
+}
+function copyTextToClipboard(text) {
+  if (!navigator.clipboard) {
+    fallbackCopyTextToClipboard(text);
+    return;
+  }
+  navigator.clipboard.writeText(text).then(function() {
+    console.log('Async: Copying to clipboard was successful!');
+  }, function(err) {
+    console.error('Async: Could not copy text: ', err);
+  });}
+    
+    </script>
 </body>
 </html>
